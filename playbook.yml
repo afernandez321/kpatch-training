@@ -1,0 +1,7 @@
+---
+- name: Audit Linux Kpatch configuration
+  hosts: kpatch_targets
+  gather_facts: true
+
+  roles:
+    - kpatch_audit
