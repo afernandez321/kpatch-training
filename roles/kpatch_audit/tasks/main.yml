@@ -4,6 +4,7 @@
   register: kpatch_package
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: Check kernel livepatch support
   ansible.builtin.command:
@@ -15,29 +16,40 @@
   register: livepatch_support
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: List Kpatch modules
   ansible.builtin.command: kpatch list
   register: kpatch_modules
   changed_when: false
   failed_when: false
+  check_mode: false
   when: kpatch_package.rc == 0
 
-- name: Collect Kpatch service status
+- name: Check Kpatch service status
   ansible.builtin.command: systemctl is-enabled kpatch
   register: kpatch_service
   changed_when: false
   failed_when: false
+  check_mode: false
 
-- name: Display Kpatch audit report
+- name: Build host compliance record
+  ansible.builtin.set_fact:
+    kpatch_report:
+      hostname: "{{ inventory_hostname }}"
+      ip: "{{ ansible_host | default(inventory_hostname) }}"
+      os: "{{ ansible_distribution }} {{ ansible_distribution_version }}"
+      kernel: "{{ ansible_kernel }}"
+      kpatch_installed: "{{ kpatch_package.rc == 0 }}"
+      livepatch_supported: "{{ livepatch_support.rc == 0 }}"
+      service_enabled: "{{ kpatch_service.stdout == 'enabled' }}"
+      patch_listing: "{{ kpatch_modules.stdout_lines | default([]) }}"
+      readiness: >-
+        {{ 'PASS' if kpatch_package.rc == 0 and
+           livepatch_support.rc == 0 and
+           (kpatch_modules.rc | default(1)) == 0
+           else 'WARN' }}
+
+- name: Display host audit result
   ansible.builtin.debug:
-    msg:
-      - "===== KPATCH AUDIT ====="
-      - "Host: {{ inventory_hostname }}"
-      - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
-      - "Kernel: {{ ansible_kernel }}"
-      - "Kpatch installed: {{ 'PASS' if kpatch_package.rc == 0 else 'FAIL' }}"
-      - "Kernel livepatch support: {{ 'PASS' if livepatch_support.rc == 0 else 'FAIL' }}"
-      - "Kpatch service enabled: {{ 'YES' if kpatch_service.stdout == 'enabled' else 'NO' }}"
-      - "Patch listing: {{ kpatch_modules.stdout_lines | default(['Kpatch not installed'], true) }}"
-      - "FINAL RESULT: {{ 'PASS - Kpatch ready for audit' if kpatch_package.rc == 0 and livepatch_support.rc == 0 else 'WARN - Kpatch prerequisites incomplete' }}"
+    msg: "KPATCH AUDIT {{ inventory_hostname }}: {{ kpatch_report.readiness }}"

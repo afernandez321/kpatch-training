@@ -5,3 +5,11 @@
 
   roles:
     - kpatch_audit
+
+- name: Generate consolidated Kpatch report
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - kpatch_report

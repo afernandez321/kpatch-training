@@ -1,0 +1,35 @@
+---
+- name: Consolidated Kpatch audit header
+  ansible.builtin.debug:
+    msg:
+      - "=============================================="
+      - "       KPATCH CONSOLIDATED AUDIT REPORT"
+      - "=============================================="
+      - "Total servers: {{ groups['kpatch_targets'] | length }}"
+
+- name: Display individual server results
+  ansible.builtin.debug:
+    msg:
+      - "----------------------------------------------"
+      - "SERVER: {{ item }}"
+      - "IP: {{ hostvars[item].kpatch_report.ip | default('UNKNOWN') }}"
+      - "OS: {{ hostvars[item].kpatch_report.os | default('UNKNOWN') }}"
+      - "Kernel: {{ hostvars[item].kpatch_report.kernel | default('UNKNOWN') }}"
+      - "Kpatch Installed: {{ 'YES' if hostvars[item].kpatch_report.kpatch_installed | default(false) | bool else 'NO' }}"
+      - "Livepatch Supported: {{ 'YES' if hostvars[item].kpatch_report.livepatch_supported | default(false) | bool else 'NO' }}"
+      - "Service Enabled: {{ 'YES' if hostvars[item].kpatch_report.service_enabled | default(false) | bool else 'NO' }}"
+      - "Patch Listing: {{ hostvars[item].kpatch_report.patch_listing | default([]) | join(' | ') }}"
+      - "FINAL RESULT: {{ hostvars[item].kpatch_report.readiness | default('FAIL - No audit data') }}"
+  loop: "{{ groups['kpatch_targets'] }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Consolidated audit summary
+  ansible.builtin.debug:
+    msg:
+      - "=============================================="
+      - "                FINAL SUMMARY"
+      - "=============================================="
+      - "Total Servers: {{ groups['kpatch_targets'] | length }}"
+      - "Audited: {{ groups['kpatch_targets'] | select('in', ansible_play_hosts_all) | list | length if false else groups['kpatch_targets'] | map('extract', hostvars, 'kpatch_report') | select('defined') | list | length }}"
+      - "Note: PASS means readiness checks passed, not that kernel CVEs were remediated."
